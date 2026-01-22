@@ -240,8 +240,10 @@ class TelegramBot:
 
             if active_session.status == "active":
                 # Пересылаем менеджеру
+                username = user_info.get("username")
+                display_name = f"@{username}" if username else user_info.get("first_name") or "user"
                 await self.client.send_message(
-                    active_session.manager_id, f"Сообщение от клиента: {message_text}"
+                    active_session.manager_id, f"[{display_name}]: {message_text}"
                 )
             else:
                 await self.client.send_message(
