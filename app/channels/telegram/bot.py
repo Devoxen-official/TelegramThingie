@@ -100,7 +100,7 @@ class TelegramBot:
             print(f"[Telegram] Error getting updates: {e}")
             return {"ok": False, "result": []}
 
-    async def handle_update(self, update: Dict[str, Any], on_message_callback=None) -> None:
+    async def handle_update(self, update: Dict[str, Any]) -> None:
         if "callback_query" in update:
             await self._handle_callback_query(update["callback_query"])
             return
@@ -150,7 +150,7 @@ class TelegramBot:
                         }
                         await self.client.send_message(
                             user_id,
-                            f"В очереди есть клиент. Хотите принять?",
+                            "В очереди есть клиент. Хотите принять?",
                             reply_markup=keyboard
                         )
                 else:
