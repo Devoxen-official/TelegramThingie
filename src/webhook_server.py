@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Awaitable, Callable, Dict, Optional
 from urllib.parse import urlparse
 
-from app.utils import Logger
+from src.utils.logger import logger
 
 
 @dataclass
@@ -16,7 +16,7 @@ class Route:
 
 
 class WebhookServer:
-    logger = Logger("WebhookServer")
+    logger = logger
 
     def __init__(
         self,
@@ -66,6 +66,7 @@ class WebhookServer:
 
                 try:
                     update = json.loads(raw_body.decode("utf-8"))
+                    logger.info(f"Received update on {request_path}: {json.dumps(update)}")
                 except json.JSONDecodeError:
                     self.send_response(400)
                     self.end_headers()

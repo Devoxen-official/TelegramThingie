@@ -2,12 +2,12 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from app.utils import Logger
+from src.utils.logger import logger
 
 
 @dataclass(frozen=True)
 class Settings:
-    logger = Logger("Settings")
+    logger = logger
 
     database_url: str = "sqlite+aiosqlite:///telegram_bot.db"
     echo: bool = False

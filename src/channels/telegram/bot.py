@@ -4,14 +4,14 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from app.services.session_service import SessionService
-from app.channels.telegram.client import TelegramClient
-from app.utils import Logger
+from src.services.session_service import SessionService
+from src.channels.telegram.client import TelegramClient
+from src.utils.logger import logger
 
 
 class TelegramBot:
 
-    logger = Logger("TelegramBot")
+    logger = logger
 
     def __init__(
         self,
@@ -103,12 +103,16 @@ class TelegramBot:
             self.logger.info(f"Error getting updates: {e}")
             return {"ok": False, "result": []}
 
-    async def handle_update(self, update: Dict[str, Any]) -> None:
+    async def handle_update(
+        self, update: Dict[str, Any], on_message_callback=None
+    ) -> None:
+        self.logger.info(f"Handling update: {update}")
         if "callback_query" in update:
             await self._handle_callback_query(update["callback_query"])
             return
 
         if "message" not in update or "text" not in update["message"]:
+            self.logger.info("Update ignored (no message or text)")
             return
 
         message = update["message"]
@@ -123,10 +127,25 @@ class TelegramBot:
             "user_id": user_id,
         }
 
-        if user_id in self.manager_ids:
+        if user_id in [str(mid) for mid in self.manager_ids]:
+            self.logger.info(f"Manager message from {user_id}: {message_text}")
             await self._handle_manager_message(user_id, message_text)
         else:
-            await self._handle_client_update(chat_id, message_text, user_info, telegram_msg_id, message)
+            self.logger.info(f"Client message from {user_id} ({chat_id}): {message_text}")
+            await self._handle_client_update(
+                chat_id, message_text, user_info, telegram_msg_id, message
+            )
+            if on_message_callback:
+                self.logger.info(f"Executing on_message_callback for {user_id}")
+                response = await asyncio.to_thread(
+                    on_message_callback,
+                    "unknown_session", # We don't have session_id here easily without more logic
+                    chat_id,
+                    message_text,
+                    user_info,
+                )
+                if response:
+                    await self.send_message(chat_id, response)
 
     async def _handle_manager_message(self, user_id: str, message_text: str) -> None:
         if message_text == "/close":

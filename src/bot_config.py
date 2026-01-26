@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-from app.config import Settings
+from src.config import Settings
 
 
 @dataclass

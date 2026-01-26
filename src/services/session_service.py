@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Message, Session
+from src.db.models import Message, Session
 
 
 class SessionService:

@@ -2,11 +2,11 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from app.utils import Logger
+from src.utils.logger import logger
 
 
 class TelegramClient:
-    logger = Logger("TelegramClient")
+    logger = logger
 
     def __init__(self, bot_token: str, timeout_s: float = 30.0) -> None:
         self.bot_token = bot_token

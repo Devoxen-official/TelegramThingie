@@ -4,20 +4,20 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv, find_dotenv
 
-from app.channels.telegram.bot import TelegramBot
-from app.channels.telegram.client import TelegramClient
-from app.bot_config import load_bot_configs
-from app.config import Settings
-from app.db.session import Database
-from app.services.session_service import SessionService
-from app.webhook_server import WebhookServer
+from src.channels.telegram.bot import TelegramBot
+from src.channels.telegram.client import TelegramClient
+from src.bot_config import load_bot_configs
+from src.config import Settings
+from src.db.session import Database
+from src.services.session_service import SessionService
+from src.webhook_server import WebhookServer
 
 def _validate_config(bots, settings: Settings) -> bool:
     if not bots:
         settings.logger.info("No bots configured. Set BOT_TOKEN or BOT_TOKENS.")
         return False
     if not settings.webhook_url and not settings.webhook_base_url:
-        settings.logger.info("WEBHOOK_BASE_URL is empty. Set it in environment or in app/config.py")
+        settings.logger.info("WEBHOOK_BASE_URL is empty. Set it in environment or in src/config.py")
         return False
     return True
 
@@ -90,7 +90,7 @@ async def _register_bot(
     WebhookServer.logger.info(f"setWebhook for {bot_cfg.name}: {webhook_result}")
     if not webhook_result.get("ok"):
         raise RuntimeError(
-            WebhookServer.logger.format_error("Registration failed. Check URL, token, and HTTPS setup.")
+            f"Registration failed for {bot_cfg.name}: {webhook_result}. Check URL, token, and HTTPS setup."
         )
 
     return bot_webhook_path, bot_cfg.name
@@ -142,7 +142,11 @@ async def main() -> None:
     except (KeyboardInterrupt, asyncio.CancelledError):
         WebhookServer.logger.info("Stopped by user")
     except RuntimeError as e:
-        WebhookServer.logger.format_error(str(e))
+        WebhookServer.logger.error(str(e))
+    except Exception as e:
+        WebhookServer.logger.error(f"Unexpected error in main: {e}")
+        import traceback
+        WebhookServer.logger.debug(traceback.format_exc())
     finally:
         if server:
             try:

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
-from app.db.base import Base
+from src.db.base import Base
 
 
 class Session(Base):
