@@ -106,7 +106,7 @@ class TelegramBot:
     async def handle_update(
         self, update: Dict[str, Any], on_message_callback=None
     ) -> None:
-        self.logger.info(f"Handling update: {update}")
+        self.logger.debug(f"Handling update: {update}")
         if "callback_query" in update:
             await self._handle_callback_query(update["callback_query"])
             return

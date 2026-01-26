@@ -25,6 +25,7 @@ class Settings:
     bot_tokens: List[str] = field(default_factory=list)
     bot_names: List[str] = field(default_factory=list)
     webhook_path: str = "/telegram/webhook"
+    env: str = "prod"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -100,4 +101,5 @@ class Settings:
             bot_tokens=bot_tokens,
             bot_names=bot_names,
             webhook_path=os.getenv("WEBHOOK_PATH", "/telegram/webhook"),
+            env=os.getenv("ENV", "prod").lower(),
         )

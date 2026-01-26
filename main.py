@@ -99,6 +99,8 @@ async def _register_bot(
 async def main() -> None:
     load_dotenv(find_dotenv())
     settings = Settings.from_env()
+    from src.utils.logger import logger
+    logger.set_level(settings.env)
 
     bots = load_bot_configs(settings)
     if not _validate_config(bots, settings):

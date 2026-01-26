@@ -66,7 +66,8 @@ class WebhookServer:
 
                 try:
                     update = json.loads(raw_body.decode("utf-8"))
-                    logger.info(f"Received update on {request_path}: {json.dumps(update)}")
+                    logger.debug(f"Received update on {request_path}: {json.dumps(update)}")
+                    logger.info(f"Received update on {request_path}")
                 except json.JSONDecodeError:
                     self.send_response(400)
                     self.end_headers()
