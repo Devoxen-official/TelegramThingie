@@ -15,8 +15,6 @@ class Session(Base):
     bot_id = Column(String(100), nullable=False, index=True)
     chat_id = Column(String(50), nullable=False, index=True)
     context_id = Column(String(100), nullable=True)
-    messages_ai = Column(JSON, nullable=True)
-    messages_client = Column(JSON, nullable=True)
     status = Column(String(20), default="waiting", nullable=False)
     manager_id = Column(String(50), nullable=True)
     created_at = Column(
@@ -48,7 +46,6 @@ class Message(Base):
     text = Column(Text, nullable=False)
 
     telegram_message_id = Column(String(50), nullable=True)
-    telegram_response = Column(JSON, nullable=True)
 
     status = Column(String(20), nullable=False)  # 'success' or 'failed'
     error_message = Column(Text, nullable=True)

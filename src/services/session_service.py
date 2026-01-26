@@ -33,8 +33,6 @@ class SessionService:
                 new_session = Session(
                     bot_id=bot_id,
                     chat_id=chat_id,
-                    messages_ai=[],
-                    messages_client=[],
                     status="waiting",
                 )
                 db_session.add(new_session)
@@ -121,23 +119,6 @@ class SessionService:
             )
             session = result.scalar_one_or_none()
             if session and session.status == "active":
-                # Collect messages before closing
-                client_msgs = []
-                manager_msgs = []
-
-                for msg in session.messages:
-                    msg_data = {
-                        "text": msg.text,
-                        "sender": msg.sender,
-                        "created_at": msg.created_at.isoformat() if msg.created_at else None
-                    }
-                    if msg.message_type == "incoming":
-                        client_msgs.append(msg_data)
-                    else:
-                        manager_msgs.append(msg_data)
-
-                session.messages_client = client_msgs
-                session.messages_ai = manager_msgs
                 session.status = "closed"
                 session.updated_at = datetime.now(timezone.utc)
                 await db_session.commit()
@@ -156,7 +137,6 @@ class SessionService:
         message_type: str,
         sender: Optional[str] = None,
         telegram_message_id: Optional[str] = None,
-        telegram_response: Optional[Dict] = None,
         status: str = "success",
         error_message: Optional[str] = None,
     ) -> int:
@@ -167,7 +147,6 @@ class SessionService:
                 sender=sender,
                 text=text,
                 telegram_message_id=telegram_message_id,
-                telegram_response=telegram_response,
                 status=status,
                 error_message=error_message,
             )

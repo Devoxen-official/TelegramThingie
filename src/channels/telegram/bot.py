@@ -33,6 +33,7 @@ class TelegramBot:
         session_id: Optional[int] = None,
         reply_markup: Optional[Dict[str, Any]] = None,
         sender: str = "bot",
+        db_text: Optional[str] = None,
     ) -> Dict[str, Any]:
         if session_id is None:
             active_session = await self.session_service.get_active_session_by_chat_id(
@@ -63,11 +64,10 @@ class TelegramBot:
             telegram_msg_id = str(response_data.get("result", {}).get("message_id", ""))
             message_id = await self.session_service.add_message_to_session(
                 session_id=session_id,
-                text=message,
+                text=db_text or message,
                 message_type="outgoing",
                 sender=sender,
                 telegram_message_id=telegram_msg_id,
-                telegram_response=response_data,
                 status="success",
             )
             result["message_id"] = message_id
@@ -76,7 +76,7 @@ class TelegramBot:
             result["error"] = f"HTTP error: {e.response.status_code} - {e.response.text}"
             message_id = await self.session_service.add_message_to_session(
                 session_id=session_id,
-                text=message,
+                text=db_text or message,
                 message_type="outgoing",
                 sender=sender,
                 status="failed",
@@ -87,7 +87,7 @@ class TelegramBot:
             result["error"] = str(e)
             message_id = await self.session_service.add_message_to_session(
                 session_id=session_id,
-                text=message,
+                text=db_text or message,
                 message_type="outgoing",
                 sender=sender,
                 status="failed",
@@ -175,6 +175,7 @@ class TelegramBot:
                 formatted_message,
                 session_id=active_session.session_id,
                 sender=db_sender,
+                db_text=message_text,
             )
 
     async def _close_manager_session(self, user_id: str) -> None:
@@ -239,7 +240,6 @@ class TelegramBot:
             message_type="incoming",
             sender=sender_name,
             telegram_message_id=telegram_msg_id,
-            telegram_response=raw_message,
             status="success",
         )
 
