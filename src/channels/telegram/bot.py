@@ -129,7 +129,7 @@ class TelegramBot:
 
         if user_id in [str(mid) for mid in self.manager_ids]:
             self.logger.info(f"Manager message from {user_id}: {message_text}")
-            await self._handle_manager_message(user_id, message_text)
+            await self._handle_manager_message(user_id, message_text, user_info)
         else:
             self.logger.info(f"Client message from {user_id} ({chat_id}): {message_text}")
             await self._handle_client_update(
@@ -147,7 +147,9 @@ class TelegramBot:
                 if response:
                     await self.send_message(chat_id, response)
 
-    async def _handle_manager_message(self, user_id: str, message_text: str) -> None:
+    async def _handle_manager_message(
+        self, user_id: str, message_text: str, manager_info: Dict[str, Any]
+    ) -> None:
         if message_text == "/close":
             await self._close_manager_session(user_id)
             return
@@ -156,9 +158,11 @@ class TelegramBot:
             self.bot_id, user_id
         )
         if active_session:
+            display_name = manager_info.get("first_name") or "Manager"
+            formatted_message = f"[{display_name}]: {message_text}"
             await self.send_message(
                 active_session.chat_id,
-                message_text,
+                formatted_message,
                 session_id=active_session.session_id,
             )
 

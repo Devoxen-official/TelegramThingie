@@ -39,15 +39,7 @@ def _resolve_secret(bot_secret: str, default_secret: str) -> Optional[str]:
 
 
 def _default_handler(session_id, chat_id, message_text, user_info):
-    name = user_info.get("first_name", "Friend")
-
-    if "hello" in message_text.lower() or "hi" in message_text.lower():
-        return f"Hey {name}! Nice to hear from you! (Session #{session_id})"
-    if "how are you" in message_text.lower():
-        return "I'm doing great! Thanks for asking."
-    if "bye" in message_text.lower():
-        return f"Goodbye {name}! Have a wonderful day!"
-    return f"Thanks for your message: '{message_text}'"
+    return None
 
 
 async def _register_bot(
