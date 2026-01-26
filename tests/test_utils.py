@@ -10,11 +10,11 @@ class TestUtils(unittest.TestCase):
             def get_log(self):
                 return logger.format_info("test")
         
-        self.assertEqual(TestClass().get_log(), "[TestClass] INFO:test")
+        self.assertEqual(TestClass().get_log(), "[TestClass] INFO: test")
         # When called from within TestUtils, it should be [TestUtils]
-        self.assertEqual(logger.format_info("test"), "[TestUtils] INFO:test")
+        self.assertEqual(logger.format_info("test"), "[TestUtils] INFO: test")
         # When called from a global function, it should be [App]
-        self.assertEqual(log_globally(), "[App] INFO:test")
+        self.assertEqual(log_globally(), "[App] INFO: test")
 
     def test_logger_levels(self):
         import io
@@ -27,8 +27,8 @@ class TestUtils(unittest.TestCase):
             logger.info("should see this")
         
         output = f.getvalue()
-        self.assertNotIn("DEBUG:should not see this", output)
-        self.assertIn("INFO:should see this", output)
+        self.assertNotIn("DEBUG: should not see this", output)
+        self.assertIn("INFO: should see this", output)
 
         logger.set_level("DEV")
         f = io.StringIO()
@@ -36,4 +36,4 @@ class TestUtils(unittest.TestCase):
             logger.debug("now should see this")
         
         output = f.getvalue()
-        self.assertIn("DEBUG:now should see this", output)
+        self.assertIn("DEBUG: now should see this", output)
