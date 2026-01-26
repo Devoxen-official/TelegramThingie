@@ -115,10 +115,29 @@ class SessionService:
     async def close_session(self, session_id: int) -> bool:
         async with self.session_factory() as db_session:
             result = await db_session.execute(
-                select(Session).where(Session.session_id == session_id)
+                select(Session)
+                .options(selectinload(Session.messages))
+                .where(Session.session_id == session_id)
             )
             session = result.scalar_one_or_none()
             if session and session.status == "active":
+                # Collect messages before closing
+                client_msgs = []
+                manager_msgs = []
+
+                for msg in session.messages:
+                    msg_data = {
+                        "text": msg.text,
+                        "sender": msg.sender,
+                        "created_at": msg.created_at.isoformat() if msg.created_at else None
+                    }
+                    if msg.message_type == "incoming":
+                        client_msgs.append(msg_data)
+                    else:
+                        manager_msgs.append(msg_data)
+
+                session.messages_client = client_msgs
+                session.messages_ai = manager_msgs
                 session.status = "closed"
                 session.updated_at = datetime.now(timezone.utc)
                 await db_session.commit()
