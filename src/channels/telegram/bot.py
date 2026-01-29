@@ -188,14 +188,21 @@ class TelegramBot:
             await self.client.send_message(user_id, "У вас нет активных сессий.")
             return
 
-        await self.session_service.close_session(active_session.session_id)
-        
+        session_id = active_session.session_id
+        chat_id = active_session.chat_id
+
+        # Send messages first for instant response
         keyboard_remove = {"remove_keyboard": True}
         await self.client.send_message(user_id, "Сессия закрыта.", reply_markup=keyboard_remove)
         await self.client.send_message(
-            active_session.chat_id, "Сессия завершена менеджером."
+            chat_id, "Сессия завершена менеджером."
         )
 
+        # Then trigger session closing (which includes LLM analysis)
+        # Since close_session takes time for LLM, it's better to run it in background
+        # or at least after sending response messages.
+        asyncio.create_task(self.session_service.close_session(session_id))
+        
         next_session = await self.session_service.get_next_waiting_session(self.bot_id)
         if next_session:
             keyboard = {

@@ -5,6 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from src.db.models import Message, Session
+from src.utils.llm import get_dialog_to_script_similarity
+from src.config import Settings
 
 
 class SessionService:
@@ -121,11 +123,60 @@ class SessionService:
             if session and session.status == "active":
                 session.status = "closed"
                 session.updated_at = datetime.now(timezone.utc)
+                
+                bot_id = session.bot_id
+                chat_id = session.chat_id
+                manager_id = session.manager_id
+                
                 await db_session.commit()
 
-                cache_key = (session.bot_id, session.chat_id)
+                cache_key = (bot_id, chat_id)
                 if cache_key in self.active_sessions:
                     del self.active_sessions[cache_key]
+
+                # We return True to indicate session was closed
+                # But we might need to perform LLM analysis
+                # We do it after commit and cache cleanup to be "instantly" responsive if called from bot
+                
+                settings = Settings.from_env()
+                if settings.llm_deepseek_api_key and settings.manager_scripts:
+                    # Load all scripts from files
+                    scripts_content = []
+                    from src.utils.logger import logger
+                    import os
+                    import asyncio
+                    for script_path in settings.manager_scripts:
+                        try:
+                            if os.path.exists(script_path):
+                                with open(script_path, 'r', encoding='utf-8') as f:
+                                    content = f.read().strip()
+                                    if content:
+                                        scripts_content.append(f"### SCRIPT FROM {script_path} ###\n{content}")
+                            else:
+                                logger.error(f"Script file not found: {script_path}")
+                        except Exception as e:
+                            logger.error(f"Failed to read script file {script_path}: {e}")
+
+                    if scripts_content:
+                        combined_script = "\n\n".join(scripts_content)
+                        dialog_str = str(session)
+                        try:
+                            # Use run_in_executor for file reading if it was many files, but here we just do the LLM call
+                            rating = await get_dialog_to_script_similarity(
+                                dialog_str, combined_script
+                            )
+                            if rating is not None:
+                                # Re-open session to update rating
+                                async with self.session_factory() as db_session_update:
+                                    result = await db_session_update.execute(
+                                        select(Session).where(Session.session_id == session_id)
+                                    )
+                                    session_to_update = result.scalar_one_or_none()
+                                    if session_to_update:
+                                        session_to_update.rating = rating
+                                        await db_session_update.commit()
+                        except Exception as e:
+                            logger.error(f"Failed to get dialog similarity: {e}")
 
                 return True
             return False
