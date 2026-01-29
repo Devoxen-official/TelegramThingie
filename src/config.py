@@ -27,6 +27,7 @@ class Settings:
     bot_names: List[str] = field(default_factory=list)
     webhook_path: str = "/telegram/webhook"
     env: str = "prod"
+    llm_deepseek_api_key: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -100,4 +101,5 @@ class Settings:
             bot_names=bot_names,
             webhook_path=os.getenv("WEBHOOK_PATH", "/telegram/webhook"),
             env=os.getenv("ENV", "prod").lower(),
+            llm_deepseek_api_key=os.getenv("LLM_DEEPSEEK_API_KEY", ""),
         )
