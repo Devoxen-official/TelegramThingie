@@ -49,24 +49,27 @@ async def get_dialog_to_script_similarity(dialog, script) -> Optional[int]:
     loop = asyncio.get_event_loop()
     response = await loop.run_in_executor(None, _do_request)
 
-    content = (
-        response.json()
-        .get("choices", [{}])[0]
-        .get("message", {})
-        .get("content")
-    )
-    
+    response_json = response.json()
+    choice = response_json.get("choices", [{}])[0]
+    message_data = choice.get("message", {})
+    content = message_data.get("content")
+    reasoning = message_data.get("reasoning")
+    error = choice.get("error") or response_json.get("error")
+
+    if not content and reasoning:
+        content = reasoning
+
     if not content:
-        if settings.env == "dev":
-            from src.utils.logger import logger
-            if logger.level is None:
-                logger.set_level("dev")
-            logger.debug(f"LLM response content is empty. Full response: {response.text}")
+        from src.utils.logger import logger
+        if logger.level is None:
+            logger.set_level(settings.env)
+        msg = f"LLM response content is empty. Full response: {response.text}"
+        if error:
+            msg = f"LLM API Error: {error}. Full response: {response.text}"
+        logger.error(msg)
         return None
 
     try:
-        # Sometimes LLM might return something like "85%" or "Rating: 85" 
-        # but we asked for ONLY integer. Let's try to find an integer if direct conversion fails.
         cleaned_content = content.strip()
         return int(cleaned_content)
     except ValueError:
@@ -75,9 +78,8 @@ async def get_dialog_to_script_similarity(dialog, script) -> Optional[int]:
         if match:
             return int(match.group())
         
-        if settings.env == "dev":
-            from src.utils.logger import logger
-            if logger.level is None:
-                logger.set_level("dev")
-            logger.debug(f"Failed to parse LLM response as int. Content: '{content}'")
+        from src.utils.logger import logger
+        if logger.level is None:
+            logger.set_level(settings.env)
+        logger.error(f"Failed to parse LLM response as int. Content: '{content}'")
         return None
