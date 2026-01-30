@@ -140,7 +140,7 @@ class TelegramBot:
                 self.logger.info(f"Executing on_message_callback for {user_id}")
                 response = await asyncio.to_thread(
                     on_message_callback,
-                    "unknown_session", # We don't have session_id here easily without more logic
+                    "unknown_session",
                     chat_id,
                     message_text,
                     user_info,
@@ -191,16 +191,12 @@ class TelegramBot:
         session_id = active_session.session_id
         chat_id = active_session.chat_id
 
-        # Send messages first for instant response
         keyboard_remove = {"remove_keyboard": True}
         await self.client.send_message(user_id, "Сессия закрыта.", reply_markup=keyboard_remove)
         await self.client.send_message(
             chat_id, "Сессия завершена менеджером."
         )
 
-        # Then trigger session closing (which includes LLM analysis)
-        # Since close_session takes time for LLM, it's better to run it in background
-        # or at least after sending response messages.
         asyncio.create_task(self.session_service.close_session(session_id))
         
         next_session = await self.session_service.get_next_waiting_session(self.bot_id)

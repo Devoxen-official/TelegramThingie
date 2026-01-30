@@ -126,21 +126,15 @@ class SessionService:
                 
                 bot_id = session.bot_id
                 chat_id = session.chat_id
-                manager_id = session.manager_id
                 
                 await db_session.commit()
 
                 cache_key = (bot_id, chat_id)
                 if cache_key in self.active_sessions:
                     del self.active_sessions[cache_key]
-
-                # We return True to indicate session was closed
-                # But we might need to perform LLM analysis
-                # We do it after commit and cache cleanup to be "instantly" responsive if called from bot
                 
                 settings = Settings.from_env()
                 if settings.llm_deepseek_api_key and settings.manager_scripts:
-                    # Load all scripts from files
                     scripts_content = []
                     from src.utils.logger import logger
                     import os
@@ -162,8 +156,6 @@ class SessionService:
                         combined_script = "\n\n".join(scripts_content)
                         dialog_str = str(session)
                         try:
-                            # Run synchronous LLM call in a thread to not block the main loop if possible,
-                            # but get_dialog_to_script_similarity now handles threading internally and returns result.
                             import asyncio
                             loop = asyncio.get_event_loop()
                             logger.info(f"Sending LLM review request for session id {session_id}")
@@ -171,7 +163,6 @@ class SessionService:
 
                             if rating is not None:
                                 logger.info(f"LLM rated session id {session_id} as {rating}")
-                                # Re-open session to update rating
                                 async with self.session_factory() as db_session_update:
                                     result = await db_session_update.execute(
                                         select(Session).where(Session.session_id == session_id)
