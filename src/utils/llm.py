@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 import requests
 import json
-import asyncio
+import concurrent.futures
 from typing import Optional
 from dotenv import load_dotenv, find_dotenv
 
@@ -15,8 +15,10 @@ from src.config import Settings
 load_dotenv(find_dotenv())
 settings = Settings.from_env()
 
+_executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
-async def get_dialog_to_script_similarity(dialog, script) -> Optional[int]:
+
+def get_dialog_to_script_similarity(dialog, script) -> Optional[int]:
     message = ("Analyze the following client-manager dialog and compare it with the provided manager script(s). "
                "The script(s) define how the manager should communicate, what questions to ask, and what information to provide. "
                "Evaluate how closely the manager followed the script(s). "
@@ -30,58 +32,66 @@ async def get_dialog_to_script_similarity(dialog, script) -> Optional[int]:
                )
 
     def _do_request():
-        return requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {settings.llm_deepseek_api_key}",
-                "Content-Type": "application/json",
-            },
-            data=json.dumps({
-                "model": "deepseek/deepseek-r1-0528:free",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": message
-                    }
-                ]
-            }),
-            timeout=60.0
-        )
+        try:
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.llm_deepseek_api_key}",
+                    "Content-Type": "application/json",
+                },
+                data=json.dumps({
+                    "model": "deepseek/deepseek-r1-0528:free",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": message
+                        }
+                    ]
+                }),
+                timeout=60.0
+            )
+            response.raise_for_status()
+            
+            response_json = response.json()
+            choice = response_json.get("choices", [{}])[0]
+            message_data = choice.get("message", {})
+            content = message_data.get("content")
+            reasoning = message_data.get("reasoning")
+            error = choice.get("error") or response_json.get("error")
 
-    loop = asyncio.get_event_loop()
-    response = await loop.run_in_executor(None, _do_request)
+            if not content and reasoning:
+                content = reasoning
 
-    response_json = response.json()
-    choice = response_json.get("choices", [{}])[0]
-    message_data = choice.get("message", {})
-    content = message_data.get("content")
-    reasoning = message_data.get("reasoning")
-    error = choice.get("error") or response_json.get("error")
+            if not content:
+                from src.utils.logger import logger
+                if logger.level is None:
+                    logger.set_level(settings.env)
+                msg = f"LLM response content is empty. Full response: {response.text}"
+                if error:
+                    msg = f"LLM API Error: {error}. Full response: {response.text}"
+                logger.error(msg)
+                return None
 
-    if not content and reasoning:
-        content = reasoning
+            try:
+                cleaned_content = content.strip()
+                return int(cleaned_content)
+            except ValueError:
+                import re
+                match = re.search(r'\d+', content)
+                if match:
+                    return int(match.group())
+                
+                from src.utils.logger import logger
+                if logger.level is None:
+                    logger.set_level(settings.env)
+                logger.error(f"Failed to parse LLM response as int. Content: '{content}'")
+                return None
+        except Exception as e:
+            from src.utils.logger import logger
+            if logger.level is None:
+                logger.set_level(settings.env)
+            logger.error(f"Error in LLM request: {e}")
+            return None
 
-    if not content:
-        from src.utils.logger import logger
-        if logger.level is None:
-            logger.set_level(settings.env)
-        msg = f"LLM response content is empty. Full response: {response.text}"
-        if error:
-            msg = f"LLM API Error: {error}. Full response: {response.text}"
-        logger.error(msg)
-        return None
-
-    try:
-        cleaned_content = content.strip()
-        return int(cleaned_content)
-    except ValueError:
-        import re
-        match = re.search(r'\d+', content)
-        if match:
-            return int(match.group())
-        
-        from src.utils.logger import logger
-        if logger.level is None:
-            logger.set_level(settings.env)
-        logger.error(f"Failed to parse LLM response as int. Content: '{content}'")
-        return None
+    future = _executor.submit(_do_request)
+    return future.result()

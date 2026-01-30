@@ -145,6 +145,7 @@ class SessionService:
                     from src.utils.logger import logger
                     import os
                     import asyncio
+                    logger.debug(f"Loading {len(settings.manager_scripts)} scripts for session {session_id} analysis")
                     for script_path in settings.manager_scripts:
                         try:
                             if os.path.exists(script_path):
@@ -161,11 +162,15 @@ class SessionService:
                         combined_script = "\n\n".join(scripts_content)
                         dialog_str = str(session)
                         try:
-                            # Use run_in_executor for file reading if it was many files, but here we just do the LLM call
-                            rating = await get_dialog_to_script_similarity(
-                                dialog_str, combined_script
-                            )
+                            # Run synchronous LLM call in a thread to not block the main loop if possible,
+                            # but get_dialog_to_script_similarity now handles threading internally and returns result.
+                            import asyncio
+                            loop = asyncio.get_event_loop()
+                            logger.info(f"Sending LLM review request for session id {session_id}")
+                            rating = await loop.run_in_executor(None, get_dialog_to_script_similarity, dialog_str, combined_script)
+
                             if rating is not None:
+                                logger.info(f"LLM rated session id {session_id} as {rating}")
                                 # Re-open session to update rating
                                 async with self.session_factory() as db_session_update:
                                     result = await db_session_update.execute(
@@ -175,6 +180,7 @@ class SessionService:
                                     if session_to_update:
                                         session_to_update.rating = rating
                                         await db_session_update.commit()
+                                        logger.debug(f"Session {session_id} rating updated in database")
                         except Exception as e:
                             logger.error(f"Failed to get dialog similarity: {e}")
 
