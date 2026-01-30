@@ -22,7 +22,9 @@ async def get_dialog_to_script_similarity(dialog, script) -> Optional[int]:
                "Evaluate how closely the manager followed the script(s). "
                "Similarity is a percentage (0-100) where 100 means perfect adherence to the script's logic and tone, "
                "and 0 means the manager completely ignored the script. "
-               "You must output ONLY the integer percentage (e.g., 85) without any additional text or explanation. "
+               "\n\nCRITICAL REQUIREMENT: Your output must be ONLY the integer number. "
+               "Do NOT include the '%' sign, do NOT include words like 'Rated:', 'Similarity:', or any explanation. "
+               "Just the number itself. For example, if the similarity is 85%, output '85'."
                f"\n\n==DIALOG==\n{dialog}\n==END OF DIALOG=="
                f"\n\n==MANAGER SCRIPTS==\n{script}\n==END OF MANAGER SCRIPTS=="
                )
