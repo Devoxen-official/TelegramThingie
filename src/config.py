@@ -27,6 +27,8 @@ class Settings:
     bot_names: List[str] = field(default_factory=list)
     webhook_path: str = "/telegram/webhook"
     env: str = "prod"
+    llm_deepseek_api_key: str = ""
+    manager_scripts: List[str] = field(default_factory=list)
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -52,7 +54,11 @@ class Settings:
         def parse_list(value: Optional[str], default: List[str]) -> List[str]:
             if value is None or not value.strip():
                 return default
-            return [item.strip() for item in value.split(",") if item.strip()]
+            # Remove leading/trailing brackets if present
+            cleaned_value = value.strip()
+            if cleaned_value.startswith("[") and cleaned_value.endswith("]"):
+                cleaned_value = cleaned_value[1:-1]
+            return [item.strip() for item in cleaned_value.split(",") if item.strip()]
 
         def parse_manager_ids(value: Optional[str]) -> List[List[str]]:
             if not value or not value.strip():
@@ -100,4 +106,6 @@ class Settings:
             bot_names=bot_names,
             webhook_path=os.getenv("WEBHOOK_PATH", "/telegram/webhook"),
             env=os.getenv("ENV", "prod").lower(),
+            llm_deepseek_api_key=os.getenv("LLM_DEEPSEEK_API_KEY", ""),
+            manager_scripts=parse_list(os.getenv("MANAGER_SCRIPTS"), []),
         )

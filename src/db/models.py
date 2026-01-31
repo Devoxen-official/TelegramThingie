@@ -17,6 +17,7 @@ class Session(Base):
     context_id = Column(String(100), nullable=True)
     status = Column(String(20), default="waiting", nullable=False)
     manager_id = Column(String(50), nullable=True)
+    rating = Column(Integer, nullable=True)
     created_at = Column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -29,6 +30,15 @@ class Session(Base):
     messages = relationship(
         "Message", back_populates="session", cascade="all, delete-orphan"
     )
+
+    def __str__(self):
+        """Returns the session dialog as a formatted string."""
+        dialog_lines = []
+        sorted_messages = sorted(self.messages, key=lambda m: m.created_at)
+        for msg in sorted_messages:
+            role = "manager" if msg.message_type == "outbound" else "client"
+            dialog_lines.append(f"{role}: {msg.text}")
+        return "\n".join(dialog_lines)
 
 
 class Message(Base):

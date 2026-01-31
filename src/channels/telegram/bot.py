@@ -140,7 +140,7 @@ class TelegramBot:
                 self.logger.info(f"Executing on_message_callback for {user_id}")
                 response = await asyncio.to_thread(
                     on_message_callback,
-                    "unknown_session", # We don't have session_id here easily without more logic
+                    "unknown_session",
                     chat_id,
                     message_text,
                     user_info,
@@ -188,14 +188,17 @@ class TelegramBot:
             await self.client.send_message(user_id, "У вас нет активных сессий.")
             return
 
-        await self.session_service.close_session(active_session.session_id)
-        
+        session_id = active_session.session_id
+        chat_id = active_session.chat_id
+
         keyboard_remove = {"remove_keyboard": True}
         await self.client.send_message(user_id, "Сессия закрыта.", reply_markup=keyboard_remove)
         await self.client.send_message(
-            active_session.chat_id, "Сессия завершена менеджером."
+            chat_id, "Сессия завершена менеджером."
         )
 
+        asyncio.create_task(self.session_service.close_session(session_id))
+        
         next_session = await self.session_service.get_next_waiting_session(self.bot_id)
         if next_session:
             keyboard = {

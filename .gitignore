@@ -3,3 +3,5 @@
 *.db
 
 .env
+manager_scripts/
+manager_scripts/*
