@@ -7,7 +7,9 @@ from sqlalchemy.orm import selectinload
 from src.db.models import Message, Session
 from src.utils.llm import get_dialog_to_script_similarity
 from src.config import Settings
-
+from src.utils.logger import logger
+import os
+import asyncio
 
 class SessionService:
     def __init__(self, session_factory) -> None:
@@ -136,9 +138,6 @@ class SessionService:
                 settings = Settings.from_env()
                 if settings.llm_deepseek_api_key and settings.manager_scripts:
                     scripts_content = []
-                    from src.utils.logger import logger
-                    import os
-                    import asyncio
                     logger.debug(f"Loading {len(settings.manager_scripts)} scripts for session {session_id} analysis")
                     for script_path in settings.manager_scripts:
                         try:
@@ -156,7 +155,6 @@ class SessionService:
                         combined_script = "\n\n".join(scripts_content)
                         dialog_str = str(session)
                         try:
-                            import asyncio
                             loop = asyncio.get_event_loop()
                             logger.info(f"Sending LLM review request for session id {session_id}")
                             rating = await loop.run_in_executor(None, get_dialog_to_script_similarity, dialog_str, combined_script)

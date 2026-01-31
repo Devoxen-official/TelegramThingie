@@ -5,6 +5,8 @@ import json
 import concurrent.futures
 from typing import Optional
 from dotenv import load_dotenv, find_dotenv
+import re
+from src.utils.logger import logger
 
 root_dir = Path(__file__).resolve().parent.parent.parent
 if str(root_dir) not in sys.path:
@@ -63,7 +65,6 @@ def get_dialog_to_script_similarity(dialog, script) -> Optional[int]:
                 content = reasoning
 
             if not content:
-                from src.utils.logger import logger
                 if logger.level is None:
                     logger.set_level(settings.env)
                 msg = f"LLM response content is empty. Full response: {response.text}"
@@ -76,18 +77,15 @@ def get_dialog_to_script_similarity(dialog, script) -> Optional[int]:
                 cleaned_content = content.strip()
                 return int(cleaned_content)
             except ValueError:
-                import re
                 match = re.search(r'\d+', content)
                 if match:
                     return int(match.group())
-                
-                from src.utils.logger import logger
+
                 if logger.level is None:
                     logger.set_level(settings.env)
                 logger.error(f"Failed to parse LLM response as int. Content: '{content}'")
                 return None
         except Exception as e:
-            from src.utils.logger import logger
             if logger.level is None:
                 logger.set_level(settings.env)
             logger.error(f"Error in LLM request: {e}")
