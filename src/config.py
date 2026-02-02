@@ -27,7 +27,9 @@ class Settings:
     bot_names: List[str] = field(default_factory=list)
     webhook_path: str = "/telegram/webhook"
     env: str = "prod"
-    llm_deepseek_api_key: str = ""
+    llm_provider: str = "deepseek"
+    llm_api_key: str = ""
+    llm_model: Optional[str] = None
     manager_scripts: List[str] = field(default_factory=list)
 
     @classmethod
@@ -106,6 +108,8 @@ class Settings:
             bot_names=bot_names,
             webhook_path=os.getenv("WEBHOOK_PATH", "/telegram/webhook"),
             env=os.getenv("ENV", "prod").lower(),
-            llm_deepseek_api_key=os.getenv("LLM_DEEPSEEK_API_KEY", ""),
+            llm_provider=os.getenv("LLM_PROVIDER", "deepseek").lower(),
+            llm_api_key=os.getenv("LLM_API_KEY", ""),
+            llm_model=os.getenv("LLM_MODEL"),
             manager_scripts=parse_list(os.getenv("MANAGER_SCRIPTS"), []),
         )
