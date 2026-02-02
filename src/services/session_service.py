@@ -174,6 +174,7 @@ class SessionService:
                             session_to_update = result.scalar_one_or_none()
                             if session_to_update:
                                 session_to_update.rating = rating
+                                session_to_update.rating_reason = reason
                                 await db_session_update.commit()
                 except Exception as e:
                     logger.error(f"Failed to get dialog similarity: {e}")

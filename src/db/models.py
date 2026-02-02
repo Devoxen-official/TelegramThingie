@@ -18,6 +18,7 @@ class Session(Base):
     status = Column(String(20), default="waiting", nullable=False)
     manager_id = Column(String(50), nullable=True)
     rating = Column(Integer, nullable=True)
+    rating_reason = Column(Text, nullable=True)
     created_at = Column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
