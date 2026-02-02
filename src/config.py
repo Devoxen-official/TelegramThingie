@@ -3,6 +3,8 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from dotenv import load_dotenv, find_dotenv
+
 from src.utils.logger import logger
 
 
@@ -34,6 +36,8 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
+        load_dotenv(find_dotenv())
+
         def parse_bool(value: Optional[str], default: bool) -> bool:
             if value is None:
                 return default

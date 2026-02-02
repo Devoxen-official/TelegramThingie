@@ -122,60 +122,63 @@ class SessionService:
                 .where(Session.session_id == session_id)
             )
             session = result.scalar_one_or_none()
-            if session and session.status == "active":
-                session.status = "closed"
-                session.updated_at = datetime.now(timezone.utc)
-                
-                bot_id = session.bot_id
-                chat_id = session.chat_id
-                
-                await db_session.commit()
+            if not session or session.status != "active":
+                return False
 
-                cache_key = (bot_id, chat_id)
-                if cache_key in self.active_sessions:
-                    del self.active_sessions[cache_key]
-                
-                settings = Settings.from_env()
-                has_llm_config = bool(settings.llm_api_key)
-                if has_llm_config and settings.manager_scripts:
-                    scripts_content = []
-                    for script_path in settings.manager_scripts:
-                        try:
-                            if os.path.exists(script_path):
-                                with open(script_path, 'r', encoding='utf-8') as f:
-                                    content = f.read().strip()
-                                    if content:
-                                        scripts_content.append(f"### SCRIPT FROM {script_path} ###\n{content}")
-                            else:
-                                logger.error(f"Script file not found: {script_path}")
-                        except Exception as e:
-                            logger.error(f"Failed to read script file {script_path}: {e}")
+            session.status = "closed"
+            session.updated_at = datetime.now(timezone.utc)
+            
+            bot_id = session.bot_id
+            chat_id = session.chat_id
+            dialog_str = str(session)
+            
+            await db_session.commit()
 
-                    if scripts_content:
-                        combined_script = "\n\n".join(scripts_content)
-                        dialog_str = str(session)
-                        try:
-                            loop = asyncio.get_event_loop()
-                            logger.info(f"Sending LLM review request for session id {session_id}")
-                            rating = await loop.run_in_executor(
-                                None, get_dialog_to_script_similarity, dialog_str, combined_script
+        cache_key = (bot_id, chat_id)
+        if cache_key in self.active_sessions:
+            del self.active_sessions[cache_key]
+        
+        settings = Settings.from_env()
+        has_llm_config = bool(settings.llm_api_key)
+        if has_llm_config and settings.manager_scripts:
+            scripts_content = []
+            for script_path in settings.manager_scripts:
+                try:
+                    if os.path.exists(script_path):
+                        with open(script_path, 'r', encoding='utf-8') as f:
+                            content = f.read().strip()
+                            if content:
+                                scripts_content.append(f"### SCRIPT FROM {script_path} ###\n{content}")
+                    else:
+                        logger.error(f"Script file not found: {script_path}")
+                except Exception as e:
+                    logger.error(f"Failed to read script file {script_path}: {e}")
+
+            if scripts_content:
+                combined_script = "\n\n".join(scripts_content)
+                try:
+                    loop = asyncio.get_event_loop()
+                    logger.info(f"Sending LLM review request for session id {session_id}")
+                    llm_result = await loop.run_in_executor(
+                        None, get_dialog_to_script_similarity, dialog_str, combined_script
+                    )
+
+                    if llm_result and "rating" in llm_result:
+                        rating = llm_result["rating"]
+                        reason = llm_result.get("reason", "No reason provided")
+                        logger.info(f"LLM rated session id {session_id} as {rating}. Reason: {reason}")
+                        async with self.session_factory() as db_session_update:
+                            result = await db_session_update.execute(
+                                select(Session).where(Session.session_id == session_id)
                             )
+                            session_to_update = result.scalar_one_or_none()
+                            if session_to_update:
+                                session_to_update.rating = rating
+                                await db_session_update.commit()
+                except Exception as e:
+                    logger.error(f"Failed to get dialog similarity: {e}")
 
-                            if rating is not None:
-                                logger.info(f"LLM rated session id {session_id} as {rating}")
-                                async with self.session_factory() as db_session_update:
-                                    result = await db_session_update.execute(
-                                        select(Session).where(Session.session_id == session_id)
-                                    )
-                                    session_to_update = result.scalar_one_or_none()
-                                    if session_to_update:
-                                        session_to_update.rating = rating
-                                        await db_session_update.commit()
-                        except Exception as e:
-                            logger.error(f"Failed to get dialog similarity: {e}")
-
-                return True
-            return False
+        return True
 
     async def add_message_to_session(
         self,

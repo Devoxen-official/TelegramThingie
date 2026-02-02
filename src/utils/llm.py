@@ -7,7 +7,6 @@ from src.config import Settings
 from src.utils.logger import logger
 
 settings = Settings.from_env()
-_executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
 class LLMProvider:
     def __init__(self, provider_name: str):
@@ -47,16 +46,16 @@ class LLMProvider:
         return content
 
 
-def get_dialog_to_script_similarity(dialog: str, script: str) -> Optional[int]:
+def get_dialog_to_script_similarity(dialog: str, script: str) -> Optional[dict]:
     prompt = (
         "Analyze the following client-manager dialog and compare it with the provided manager script(s). "
         "The script(s) define how the manager should communicate, what questions to ask, and what information to provide. "
         "Evaluate how closely the manager followed the script(s). "
         "Similarity is a percentage (0-100) where 100 means perfect adherence to the script's logic and tone, "
         "and 0 means the manager completely ignored the script. "
-        "\n\nCRITICAL REQUIREMENT: Your output must be ONLY the integer number. "
-        "Do NOT include the '%' sign, do NOT include words like 'Rated:', 'Similarity:', or any explanation. "
-        "Just the number itself. For example, if the similarity is 85%, output '85'."
+        "\n\nCRITICAL REQUIREMENT: Your output must be in the following format: "
+        "rating:<number>;reason:\"<ONE SHORT sentence about why it gave this rating>\" "
+        "For example: rating:85;reason:\"The manager followed the script closely but missed one question.\""
         f"\n\n==DIALOG==\n{dialog}\n==END OF DIALOG=="
         f"\n\n==MANAGER SCRIPTS==\n{script}\n==END OF MANAGER SCRIPTS=="
     )
@@ -68,10 +67,18 @@ def get_dialog_to_script_similarity(dialog: str, script: str) -> Optional[int]:
             if not content:
                 return None
 
-            match = re.search(r'\d+', content)
-            return int(match.group()) if match else None
+            rating_match = re.search(r'rating\s*:\s*(\d+)', content)
+            reason_match = re.search(r'reason\s*:\s*"([^"]+)"', content)
+            
+            rating = int(rating_match.group(1)) if rating_match else None
+            reason = reason_match.group(1) if reason_match else None
+            
+            if rating is None:
+                return None
+
+            return {"rating": rating, "reason": reason}
         except Exception as e:
             logger.error(f"LLM Error: {e}")
             return None
 
-    return _executor.submit(_request).result()
+    return _request()
