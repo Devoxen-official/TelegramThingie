@@ -140,19 +140,33 @@ class SessionService:
         
         settings = Settings.from_env()
         has_llm_config = bool(settings.llm_api_key)
-        if has_llm_config and settings.manager_scripts:
-            scripts_content = []
-            for script_path in settings.manager_scripts:
-                try:
-                    if os.path.exists(script_path):
-                        with open(script_path, 'r', encoding='utf-8') as f:
-                            content = f.read().strip()
-                            if content:
-                                scripts_content.append(f"### SCRIPT FROM {script_path} ###\n{content}")
-                    else:
-                        logger.error(f"Script file not found: {script_path}")
-                except Exception as e:
-                    logger.error(f"Failed to read script file {script_path}: {e}")
+
+        #вадим ты доволен?
+        if not (has_llm_config and settings.manager_scripts):
+            return
+
+        scripts_content = []
+        for script_path in settings.manager_scripts:
+            if not os.path.exists(script_path):
+                logger.error(f"Script file not found: {script_path}")
+                continue
+
+            try:
+                with open(script_path, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+
+                if not content:
+                    continue
+
+                scripts_content.append(
+                    f"### SCRIPT FROM {script_path} ###\n{content}"
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"Failed to read script file {script_path}: {e}"
+                )
+            #СУКА ТЕПЕРЬ ТЫ ДОВОЛЕН?
 
             if scripts_content:
                 combined_script = "\n\n".join(scripts_content)
