@@ -141,7 +141,6 @@ class SessionService:
         settings = Settings.from_env()
         has_llm_config = bool(settings.llm_api_key)
 
-        #вадим ты доволен?
         if not (has_llm_config and settings.manager_scripts):
             return
 
@@ -166,7 +165,6 @@ class SessionService:
                 logger.error(
                     f"Failed to read script file {script_path}: {e}"
                 )
-            #СУКА ТЕПЕРЬ ТЫ ДОВОЛЕН?
 
             if scripts_content:
                 combined_script = "\n\n".join(scripts_content)
