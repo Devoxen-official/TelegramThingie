@@ -58,7 +58,7 @@ async def _register_bot(
         telegram_client,
         session_service,
         bot_id=bot_cfg.name,
-        manager_ids=bot_cfg.manager_ids,
+        config=bot_cfg,
     )
 
     if settings.webhook_url and single_bot:

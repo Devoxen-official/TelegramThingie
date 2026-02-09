@@ -6,6 +6,7 @@ import httpx
 
 from src.services.session_service import SessionService
 from src.channels.telegram.client import TelegramClient
+from src.bot_config import BotConfig
 from src.utils.logger import logger
 
 
@@ -18,13 +19,14 @@ class TelegramBot:
         client: TelegramClient,
         session_service: SessionService,
         bot_id: str,
-        manager_ids: List[str],
+        config: BotConfig,
     ) -> None:
         self.client = client
         self.session_service = session_service
         self.last_update_id = 0
         self.bot_id = bot_id
-        self.manager_ids = manager_ids
+        self.config = config
+        self.manager_ids = config.manager_ids
 
     async def send_message(
         self,
@@ -340,11 +342,26 @@ class TelegramBot:
                 session_data = await self.session_service.get_session_messages(session_id)
                 if session_data:
                     client_chat_id = session_data["chat_id"]
-                    await self.send_message(
-                        client_chat_id,
-                        "Здравствуйте! Я менеджер компании Y. Чем я могу вам помочь?",
-                        session_id=session_id,
-                    )
+                    
+                    # Get personalized greeting
+                    manager_config = self.config.managers.get(manager_id)
+                    greeting = None
+                    if manager_config:
+                        greeting = manager_config.greeting
+                    
+                    if greeting and greeting.lower() != "none" and greeting.strip() != "":
+                        await self.send_message(
+                            client_chat_id,
+                            greeting,
+                            session_id=session_id,
+                        )
+                    else:
+                        # Fallback if no greeting is configured
+                        await self.send_message(
+                            client_chat_id,
+                            "Менеджер подключился к диалогу.",
+                            session_id=session_id,
+                        )
             else:
                 await self.client.answer_callback_query(
                     callback_query["id"],

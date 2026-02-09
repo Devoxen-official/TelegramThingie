@@ -1,11 +1,27 @@
 import re
 import os
+import json
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from dotenv import load_dotenv, find_dotenv
 
 from src.utils.logger import logger
+
+
+@dataclass(frozen=True)
+class ManagerSettings:
+    name: str
+    greeting: str
+    script_paths: List[str]
+    lang: str
+
+
+@dataclass(frozen=True)
+class BotSettings:
+    token: str
+    primary_lang: str
+    managers: Dict[str, ManagerSettings]
 
 
 @dataclass(frozen=True)
@@ -23,16 +39,14 @@ class Settings:
     webhook_allowed_updates: List[str] = field(
         default_factory=lambda: ["message", "callback_query"]
     )
-    manager_ids: List[List[str]] = field(default_factory=list)
     webhook_url: Optional[str] = None
-    bot_tokens: List[str] = field(default_factory=list)
-    bot_names: List[str] = field(default_factory=list)
     webhook_path: str = "/telegram/webhook"
     env: str = "prod"
     llm_provider: str = "deepseek"
     llm_api_key: str = ""
     llm_model: Optional[str] = None
-    manager_scripts: List[str] = field(default_factory=list)
+    
+    bots: Dict[str, BotSettings] = field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -66,31 +80,35 @@ class Settings:
                 cleaned_value = cleaned_value[1:-1]
             return [item.strip() for item in cleaned_value.split(",") if item.strip()]
 
-        def parse_manager_ids(value: Optional[str]) -> List[List[str]]:
-            if not value or not value.strip():
-                return []
+        def load_bots_from_json(path: str) -> Dict[str, BotSettings]:
+            if not os.path.exists(path):
+                cls.logger.warning(f"Config file {path} not found.")
+                return {}
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                bots = {}
+                for bot_name, bot_data in data.items():
+                    managers = {}
+                    for m_id, m_data in bot_data.get("managers", {}).items():
+                        managers[m_id] = ManagerSettings(
+                            name=m_data.get("name", ""),
+                            greeting=m_data.get("greeting", ""),
+                            script_paths=m_data.get("script_paths", []),
+                            lang=m_data.get("lang", "en")
+                        )
+                    bots[bot_name] = BotSettings(
+                        token=bot_data.get("token", ""),
+                        primary_lang=bot_data.get("primary_lang", "en"),
+                        managers=managers
+                    )
+                return bots
+            except Exception as e:
+                cls.logger.error(f"Failed to load {path}: {e}")
+                return {}
 
-            result = []
-            groups = re.findall(r'\[(.*?)\]', value)
-            if groups:
-                for group in groups:
-                    ids = [i.strip() for i in group.split(',') if i.strip()]
-                    result.append(ids)
-            else:
-                ids = [i.strip() for i in value.split(',') if i.strip()]
-                if ids:
-                    result.append(ids)
-            return result
-
-        bot_tokens = parse_list(os.getenv("BOT_TOKENS"), [])
-        bot_names = parse_list(os.getenv("BOT_NAMES"), [])
-        if not bot_tokens and os.getenv("BOT_TOKEN"):
-            bot_tokens = [os.getenv("BOT_TOKEN")]
-            if not bot_names:
-                bot_names = ["default"]
-
-        manager_ids_raw = os.getenv("MANAGER_IDS")
-        manager_ids = parse_manager_ids(manager_ids_raw)
+        bots = load_bots_from_json("bot_configs.json")
 
         return cls(
             database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///telegram_bot.db"),
@@ -106,14 +124,11 @@ class Settings:
             webhook_allowed_updates=parse_list(
                 os.getenv("WEBHOOK_ALLOWED_UPDATES"), ["message", "callback_query"]
             ),
-            manager_ids=manager_ids,
             webhook_url=os.getenv("WEBHOOK_URL"),
-            bot_tokens=bot_tokens,
-            bot_names=bot_names,
             webhook_path=os.getenv("WEBHOOK_PATH", "/telegram/webhook"),
             env=os.getenv("ENV", "prod").lower(),
             llm_provider=os.getenv("LLM_PROVIDER", "deepseek").lower(),
             llm_api_key=os.getenv("LLM_API_KEY", ""),
             llm_model=os.getenv("LLM_MODEL"),
-            manager_scripts=parse_list(os.getenv("MANAGER_SCRIPTS"), []),
+            bots=bots,
         )

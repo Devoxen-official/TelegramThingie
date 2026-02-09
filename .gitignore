@@ -4,3 +4,4 @@
 
 .env
 manager_scripts/*
+bot_configs.json
