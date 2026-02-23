@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 from typing import List, Optional, Dict
 
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session as OrmSession
+
 from src.config import Settings, BotSettings, ManagerSettings
+from src.db.models import BotConfigModel, ManagerConfigModel
 
 
 @dataclass
@@ -32,23 +36,40 @@ def _normalize_path(path: str) -> str:
 def load_bot_configs(settings: Settings) -> List[BotConfig]:
     configs: List[BotConfig] = []
 
-    if not settings.bots:
-        return configs
+    # Load bot configs from a separate sync SQLite database (telegram_bot_configs.db)
+    # Using sync SQLAlchemy here to keep this function synchronous.
+    configs_db_url = "sqlite:///telegram_bot_configs.db"
+    engine = create_engine(configs_db_url, future=True)
 
-    for name, bot_settings in settings.bots.items():
-        if len(settings.bots) == 1:
-             path = _normalize_path(settings.webhook_path)
-        else:
-             path = f"{settings.webhook_path_prefix}/{name}"
+    with OrmSession(engine) as session:
+        bots = session.execute(select(BotConfigModel)).scalars().all()
+        for bot in bots:
+            mgr_rows = session.execute(
+                select(ManagerConfigModel).where(ManagerConfigModel.bot_id == bot.id)
+            ).scalars().all()
+            managers: Dict[str, ManagerSettings] = {}
+            for m in mgr_rows:
+                managers[m.manager_id] = ManagerSettings(
+                    name=m.name,
+                    greeting=m.greeting,
+                    script_paths=m.script_paths or [],
+                    lang=m.lang or "en",
+                )
 
-        configs.append(
-            BotConfig(
-                name=name,
-                token=bot_settings.token,
-                webhook_path=_normalize_path(path),
-                primary_lang=bot_settings.primary_lang,
-                managers=bot_settings.managers,
-                secret_token=settings.webhook_secret_token or "",
+            if len(bots) == 1:
+                path = _normalize_path(settings.webhook_path)
+            else:
+                path = f"{settings.webhook_path_prefix}/{bot.name}"
+
+            configs.append(
+                BotConfig(
+                    name=bot.name,
+                    token=bot.token,
+                    webhook_path=_normalize_path(path),
+                    primary_lang=bot.primary_lang,
+                    managers=managers,
+                    secret_token=settings.webhook_secret_token or "",
+                )
             )
-        )
+
     return configs

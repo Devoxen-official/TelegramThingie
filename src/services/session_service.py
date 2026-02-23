@@ -6,8 +6,11 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session as OrmSession
+
 from src.config import Settings
-from src.db.models import Message, Session
+from src.db.models import Message, Session, BotConfigModel, ManagerConfigModel
 from src.utils.llm import get_dialog_to_script_similarity
 from src.utils.logger import logger
 
@@ -141,11 +144,29 @@ class SessionService:
         settings = Settings.from_env()
         has_llm_config = bool(settings.llm_api_key)
 
-        if not (has_llm_config and settings.manager_scripts):
-            return
+        manager_id = session.manager_id
+        manager_scripts: List[str] = []
+        if manager_id:
+            # Read manager scripts from separate configs DB (sync SQLite)
+            engine = create_engine("sqlite:///telegram_bot_configs.db", future=True)
+            with OrmSession(engine) as orm_sess:
+                bot_row = orm_sess.execute(
+                    select(BotConfigModel).where(BotConfigModel.name == bot_id)
+                ).scalar_one_or_none()
+                if bot_row:
+                    mgr_row = orm_sess.execute(
+                        select(ManagerConfigModel)
+                        .where(ManagerConfigModel.bot_id == bot_row.id)
+                        .where(ManagerConfigModel.manager_id == manager_id)
+                    ).scalar_one_or_none()
+                    if mgr_row and mgr_row.script_paths:
+                        manager_scripts = list(mgr_row.script_paths)
+
+        if not (has_llm_config and manager_scripts):
+            return True
 
         scripts_content = []
-        for script_path in settings.manager_scripts:
+        for script_path in manager_scripts:
             if not os.path.exists(script_path):
                 logger.error(f"Script file not found: {script_path}")
                 continue
@@ -166,30 +187,30 @@ class SessionService:
                     f"Failed to read script file {script_path}: {e}"
                 )
 
-            if scripts_content:
-                combined_script = "\n\n".join(scripts_content)
-                try:
-                    loop = asyncio.get_event_loop()
-                    logger.info(f"Sending LLM review request for session id {session_id}")
-                    llm_result = await loop.run_in_executor(
-                        None, get_dialog_to_script_similarity, dialog_str, combined_script
-                    )
+        if scripts_content:
+            combined_script = "\n\n".join(scripts_content)
+            try:
+                loop = asyncio.get_event_loop()
+                logger.info(f"Sending LLM review request for session id {session_id}")
+                llm_result = await loop.run_in_executor(
+                    None, get_dialog_to_script_similarity, dialog_str, combined_script
+                )
 
-                    if llm_result and "rating" in llm_result:
-                        rating = llm_result["rating"]
-                        reason = llm_result.get("reason", "No reason provided")
-                        logger.info(f"LLM rated session id {session_id} as {rating}. Reason: {reason}")
-                        async with self.session_factory() as db_session_update:
-                            result = await db_session_update.execute(
-                                select(Session).where(Session.session_id == session_id)
-                            )
-                            session_to_update = result.scalar_one_or_none()
-                            if session_to_update:
-                                session_to_update.rating = rating
-                                session_to_update.rating_reason = reason
-                                await db_session_update.commit()
-                except Exception as e:
-                    logger.error(f"Failed to get dialog similarity: {e}")
+                if llm_result and "rating" in llm_result:
+                    rating = llm_result["rating"]
+                    reason = llm_result.get("reason", "No reason provided")
+                    logger.info(f"LLM rated session id {session_id} as {rating}. Reason: {reason}")
+                    async with self.session_factory() as db_session_update:
+                        result = await db_session_update.execute(
+                            select(Session).where(Session.session_id == session_id)
+                        )
+                        session_to_update = result.scalar_one_or_none()
+                        if session_to_update:
+                            session_to_update.rating = rating
+                            session_to_update.rating_reason = reason
+                            await db_session_update.commit()
+            except Exception as e:
+                logger.error(f"Failed to get dialog similarity: {e}")
 
         return True
 

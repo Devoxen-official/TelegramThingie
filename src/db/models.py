@@ -79,3 +79,34 @@ class BusinessClient(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
     client_metadata = Column(JSON, nullable=True)
+
+
+class BotConfigModel(Base):
+    """Model for bot configurations."""
+
+    __tablename__ = "bot_configs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True, index=True)
+    token = Column(String(255), nullable=False, unique=True)
+    primary_lang = Column(String(10), default="en", nullable=False)
+
+    managers = relationship(
+        "ManagerConfigModel", back_populates="bot", cascade="all, delete-orphan"
+    )
+
+
+class ManagerConfigModel(Base):
+    """Model for manager settings within a bot."""
+
+    __tablename__ = "manager_configs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    bot_id = Column(Integer, ForeignKey("bot_configs.id"), nullable=False, index=True)
+    manager_id = Column(String(50), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    greeting = Column(Text, nullable=False)
+    script_paths = Column(JSON, nullable=False)
+    lang = Column(String(10), default="en", nullable=False)
+
+    bot = relationship("BotConfigModel", back_populates="managers")
